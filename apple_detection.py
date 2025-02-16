@@ -4,7 +4,7 @@ from cv2 import imshow as imshow
 import numpy as np
 
 def detect_apples(image, min_radius=30, max_radius=800, param1=50, param2=40):
-    circles = detect_circles(image, min_radius=min_radius, max_radius=max_radius, param1=param1, param2=param1)
+    circles = detect_circles(image, min_radius=min_radius, max_radius=max_radius, param1=param1, param2=param2)
     filtered_circles = remove_contained_circles(circles, image)
     # Returns 2 values: the image with the circles drawn on it,
     # and the bounding boxes/circles of the detected apples
@@ -94,7 +94,7 @@ def is_apple_color(pixel_values, red_threshold=100, green_threshold=50, blue_thr
     # and not too many blue pixels
     if red_pixels_above_threshold > 0 and green_pixels_above_threshold > 0:
         # Ensure that blue pixels are not dominant
-        if blue_pixels_below_threshold > len(pixel_values) * 0.2:  # Allow up to 20% blue pixels
+        if blue_pixels_below_threshold > len(pixel_values) * 0.1:  # Allow up to 20% blue pixels
             return True
 
     return False
@@ -136,7 +136,7 @@ def remove_contained_circles(circles, image):
         if not is_apple_color(circle_pixels):
             continue
         
-        # Check for containment (same as original logic)
+        # Check for containment
         for j, (x2, y2, r2) in enumerate(circles):
             if i == j:
                 continue
