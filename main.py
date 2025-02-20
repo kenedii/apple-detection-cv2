@@ -9,11 +9,11 @@ app = FastAPI(title="Apple Detector API")
 
 @app.get("/")
 async def read_root():
-    return {"message": "Welcome to the Apple Detector API. Visit /docs for the API documentation."}
+    return {"message": "Visit /docs for the API documentation."}
 
 @app.post("/is_apple")
 async def is_apple(file: UploadFile = File(...)):
-    if not file.content_type.startswith("image/"): # Ensure the uploaded file is an image
+    if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Uploaded file is not an image.")
 
     contents = await file.read() # Read the file into memory.
@@ -21,7 +21,7 @@ async def is_apple(file: UploadFile = File(...)):
     image = cv2.imdecode(np_array, cv2.IMREAD_COLOR_BGR)
 
     
-    if image is None: # Check that the image was correctly decoded
+    if image is None: # Ensure the image was correctly decoded
         raise HTTPException(status_code=400, detail="Could not decode the image.")
 
     processed_image, detected_apples = detect_apples(image) # Detect apples in the image
