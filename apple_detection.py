@@ -4,10 +4,17 @@ from cv2 import imshow as imshow
 import numpy as np
 
 def detect_apples(image, min_radius=30, max_radius=800, param1=50, param2=40):
+    """
+    Function to detect apples in an image.
+    Params:
+    Same as detect_circles()
+
+    Returns:
+    # np array, the image with the circles drawn on it,
+    # np array, the bounding boxes/circles of the detected apples
+    """
     circles = detect_circles(image, min_radius=min_radius, max_radius=max_radius, param1=param1, param2=param2)
     filtered_circles = remove_contained_circles(circles, image)
-    # Returns 2 values: the image with the circles drawn on it,
-    # and the bounding boxes/circles of the detected apples
     return draw_circles(image, filtered_circles), filtered_circles
 
 
@@ -15,15 +22,15 @@ def detect_circles(image, min_radius=30, max_radius=800, param1=50, param2=40):
     """
     Function to detect circles in an image using the Hough Circle Transform.
     
-    Args:
-    - image (numpy array): Input image on which circles need to be detected.
-    - min_radius (int): Minimum radius of the circles to detect.
-    - max_radius (int): Maximum radius of the circles to detect.
-    - param1 (int): First method-specific parameter for edge detection (higher is stricter).
-    - param2 (int): Second method-specific parameter for circle center detection (lower is stricter).
+    Params:
+    - image (np array): Input image on which circles need to be detected.
+    - min_radius: Minimum radius of the circles to detect.
+    - max_radius: Maximum radius of the circles to detect.
+    - param1: First method-specific parameter for edge detection (higher is stricter).
+    - param2: Second method-specific parameter for circle center detection (lower is stricter).
     
     Returns:
-    - circles (numpy array): Detected circles, each represented by [x, y, r] (center and radius).
+    - np array: Detected circles, each represented by [x, y, r] (center and radius).
     """
     # Convert the image to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -48,12 +55,12 @@ def draw_circles(image, circles):
     """
     Function to draw circles on an image.
     
-    Args:
-    - image (numpy array): Input image to draw the circles on.
-    - circles (numpy array): Detected circles (each circle is [x, y, r]).
+    Params:
+    - image (np array): Input image to draw the circles on.
+    - circles (np array): Detected circles (each circle is [x, y, r]).
     
     Returns:
-    - image_with_circles (numpy array): Image with circles drawn.
+    - image_with_circles (np array): Image with circles drawn.
     """
     image_with_circles = image.copy()
     
@@ -65,15 +72,103 @@ def draw_circles(image, circles):
     
     return image_with_circles
 
-def is_apple_color(pixel_values, red_threshold=100, green_threshold=50, blue_threshold=50):
+def is_apple_colour(pixel_values, colour_space):
+    """
+    Params:
+    pixel_values (np array): Array of pixel values from the circle area.
+    colour_space (str): Colour space to use for the analysis ('RGB' or 'HSV').
+
+    Returns:
+    bool: True if the colour distribution suggests the circle is likely an apple.
+    """
+    if colour_space.upper() == 'RGB':
+        return is_apple_colour_rgb(pixel_values)
+    elif colour_space.upper() == 'HSV':
+        return is_apple_colour_hsv(pixel_values)
+    else:
+        raise ValueError("Invalid colour space. Choose 'RGB' or 'HSV'.")
+
+def is_apple_colour_hsv(pixel_values, 
+                       red_hue_low=10, 
+                       red_hue_high=170, 
+                       green_hue_lower=35, 
+                       green_hue_upper=85, 
+                       saturation_threshold=100, 
+                       value_threshold=100, 
+                       apple_fraction_threshold=0.3,
+                       valid_pixel_fraction_threshold=0.5,
+                       non_apple_fraction_threshold=0.4):
+    """
+    Determine whether the color distribution in an HSV region is likely that of an apple,
+    supporting both red and green apples while excluding non-apple colors like blue, orange, or black.
+    
+    Params:
+      pixel_values (np array): Array of shape (n, 3) containing HSV pixels (H in [0, 179], S and V in [0, 255])
+      red_hue_low: Upper bound for the lower red hue range
+      red_hue_high: Lower bound for the upper red hue range
+      green_hue_lower: Lower bound for the green apple hue range
+      green_hue_upper: Upper bound for the green apple hue range
+      saturation_threshold: Minimum saturation for a pixel to be considered valid
+      value_threshold: Minimum brightness for a pixel to be considered valid
+      apple_fraction_threshold (float): Minimum fraction of valid pixels that must be apple-like (%)
+      valid_pixel_fraction_threshold (float): Minimum fraction of pixels that must be valid (%) 
+      non_apple_fraction_threshold (float): Maximum fraction of valid pixels allowed in non-apple hues (%)
+    
+    Returns:
+      bool: True if the region is likely an apple, False otherwise.
+    """
+    # Total number of pixels in the circle
+    total_pixels = pixel_values.shape[0]
+    
+    # Extract HSV channels
+    hue = pixel_values[:, 0]
+    sat = pixel_values[:, 1]
+    val = pixel_values[:, 2]
+    
+    # Step 1: Filter pixels that are bright and saturated
+    valid = (sat >= saturation_threshold) & (val >= value_threshold)
+    num_valid = np.sum(valid)
+    
+    # Check if enough pixels are valid (avoids misclassifying dark objects)
+    if num_valid / total_pixels < valid_pixel_fraction_threshold:
+        return False
+    
+    # Step 2: Check for non-apple colors to reduce false positives
+    # Orange hues: 10–25
+    orange_pixels = valid & (hue >= 10) & (hue <= 25)
+    # Blue hues: 100–140
+    blue_pixels = valid & (hue >= 100) & (hue <= 140)
+    
+    orange_fraction = np.sum(orange_pixels) / num_valid
+    blue_fraction = np.sum(blue_pixels) / num_valid
+    
+    # Reject if too many pixels are orange or blue
+    if orange_fraction > non_apple_fraction_threshold or blue_fraction > non_apple_fraction_threshold:
+        return False
+    
+    # Step 3: Identify apple-colored pixels
+    red_pixels = valid & ((hue < red_hue_low) | (hue > red_hue_high))
+    green_pixels = valid & (hue >= green_hue_lower) & (hue <= green_hue_upper)
+    
+    # Calculate fractions of apple colors among valid pixels
+    red_fraction = np.sum(red_pixels) / num_valid
+    green_fraction = np.sum(green_pixels) / num_valid
+    
+    # Classify as apple if sufficient red or green pixels are present
+    if red_fraction >= apple_fraction_threshold or green_fraction >= apple_fraction_threshold:
+        return True
+    
+    return False
+
+def is_apple_colour_rgb(pixel_values, red_threshold=100, green_threshold=50, blue_threshold=50):
     """
     Function to check if the color distribution of the pixels suggests it's an apple.
     
-    Args:
-    - pixel_values (numpy array): Array of pixel values from the circle area.
-    - red_threshold (int): Minimum red intensity for apple-like color.
-    - green_threshold (int): Minimum green intensity for apple-like color.
-    - blue_threshold (int): Maximum blue intensity to avoid blue objects.
+    Params:
+    - pixel_values (np array): Array of pixel values from the circle area.
+    - red_threshold: Minimum red intensity for apple
+    - green_threshold: Minimum green intensity for apple
+    - blue_threshold: Maximum blue intensity to avoid blue objects
     
     Returns:
     - bool: True if the color distribution suggests the circle is likely an apple.
@@ -104,12 +199,12 @@ def remove_contained_circles(circles, image):
     Function to remove circles that are fully contained within another circle, 
     and also validate that the circle corresponds to an apple based on its color.
     
-    Args:
-    - circles (numpy array): Detected circles (each circle is [x, y, r]).
-    - image (numpy array): The image from which the circles were detected.
+    Params:
+    - circles (np array): Detected circles (each circle is [x, y, r]).
+    - image (np array): The image from which the circles were detected.
     
     Returns:
-    - filtered_circles (numpy array): Circles that are not fully contained within another circle 
+    - filtered_circles (np array): Circles that are not fully contained within another circle 
       and are likely apples.
     """
     # List to store circles that are not contained and likely apples
@@ -129,11 +224,11 @@ def remove_contained_circles(circles, image):
         # Extract the region inside the circle using the mask
         circle_region = cv2.bitwise_and(image, image, mask=mask)
 
-        # Only keep non-zero pixels (i.e., the pixels inside the circle)
+        # Only keep non-zero pixels (the pixels inside the circle)
         circle_pixels = circle_region[mask != 0]
 
         # Check if the color distribution suggests it's an apple
-        if not is_apple_color(circle_pixels):
+        if not is_apple_colour(circle_pixels, "RGB"): # Use RGB
             continue
         
         # Check for containment
