@@ -31,7 +31,8 @@ async def is_apple(file: UploadFile = File(...)):
     processed_image = draw_boxes(processed_image, detected_bananas) # Draw bounding boxes around detected bananas
 
     detections = {
-        "apples": [detected_apples.size, detected_apples],
+        # fruit: [number of detections, coordinates of detections]
+        "apples": [detected_apples.size, detected_apples], 
         "bananas": [detected_bananas.size, detected_bananas]
     }
 
