@@ -3,7 +3,8 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse
-from apple_detection import detect_apples
+from apple_detection import detect_apples, draw_circles
+from banana_detection import detect_bananas, draw_boxes
 
 app = FastAPI(title="Apple Detector API")
 
@@ -25,7 +26,14 @@ async def is_apple(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Could not decode the image.")
 
     processed_image, detected_apples = detect_apples(image) # Detect apples in the image
-    # detected_apples is a list of bounding boxes/circles of the detected apples
+    processed_image, detected_bananas = detect_bananas(processed_image) # Detect bananas in the image
+    processed_image = draw_circles(processed_image, detected_apples) # Draw circles around detected apples
+    processed_image = draw_boxes(processed_image, detected_bananas) # Draw bounding boxes around detected bananas
+
+    detections = {
+        "apples": [detected_apples.size, detected_apples],
+        "bananas": [detected_bananas.size, detected_bananas]
+    }
 
     # Encode the processed image to JPEG format
     success, encoded_image = cv2.imencode(".jpg", processed_image)

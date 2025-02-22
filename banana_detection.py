@@ -61,3 +61,31 @@ def detect_bananas(image):
     else:
         bounding_boxes = np.zeros((0, 4), dtype=np.int32)
     return image, bounding_boxes
+
+def draw_boxes(image, bounding_boxes):
+    """
+    Draws blue bounding boxes on an image.
+
+    Parameters:
+      image (np.ndarray): Input image as a 3-channel color NumPy array (BGR).
+      bounding_boxes (iterable): An array (or list) of bounding boxes in the format [x, y, w, h].
+
+    Returns:
+      np.ndarray: The image with blue bounding boxes drawn.
+    """
+    # Check if the image is valid.
+    if not isinstance(image, np.ndarray) or image.ndim != 3 or image.shape[2] != 3:
+        raise ValueError("Invalid image. Expected a 3-channel BGR image.")
+    
+    # Create a copy of the image to draw the boxes on.
+    image_with_boxes = image.copy()
+    
+    # Loop over the bounding boxes and draw a blue rectangle for each.
+    for box in bounding_boxes:
+        if len(box) != 4:
+            continue  # Skip invalid box
+        x, y, w, h = box
+        # Draw the rectangle with blue color (BGR: 255, 0, 0) and thickness 2.
+        cv2.rectangle(image_with_boxes, (x, y), (x + w, y + h), (255, 0, 0), 2)
+    
+    return image_with_boxes
